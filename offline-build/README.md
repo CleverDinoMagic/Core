@@ -38,13 +38,27 @@ BKCommonLib, and HolographicDisplays are compile-time APIs, not replacement
 server implementations. The existing server plugin requirements still apply.
 Creative targets the 1.16 API; the other Bukkit modules retain the 1.12 API.
 
-Audio and Cosmetics source and binaries are absent from these repositories.
-`api-contracts/` supplies **compile-only declarations** of the API calls already
-used by the plugins. These classes throw if executed and are never included in
-any output JAR. They do not implement Audio or Cosmetics; installing those
-original plugins remains necessary for the corresponding functionality. Their
-runtime binary compatibility must be checked against the actual server versions;
-this workspace does not contain those plugins or a running Minecraft server.
+Audio and Cosmetics are private and are not required by this public build.
+The compile-only declarations have been removed. Show skips legacy AudioStart
+and AudioSync cues while preserving the visual timeline, and logs this limitation
+at startup. Creative runs visual shows without music; park loops and music
+selection are unavailable, with existing track/loop files left untouched.
+Cosmetics commands and menu buttons explain that the feature is unavailable.
+No replacement private plugin implementation is bundled. Every packaged JAR is
+checked for private plugin dependencies and private API references in class files.
+
+### Install each JAR on the correct server
+
+- `PalaceBungee.jar` belongs only in the BungeeCord-compatible proxy's plugins
+  directory. Do not put it in Paper/Spigot's plugins directory.
+- `Creative.jar` targets Minecraft 1.16 and requires compatible PlotSquared v5 and
+  WorldEdit 7. Do not install it on Paper 1.12.2. PlotSquared is
+  a real public server plugin, not an API supplied by the compiled Creative JAR.
+- The other nine Bukkit plugins target the legacy 1.12 API and require the public
+  server plugins listed in their descriptors. ParkManager requires both WorldEdit
+  and WorldGuard; Photopass requires TrainCarts and BKCommonLib.
+
+The build also writes these deployment notes to `dist/INSTALL.txt`.
 
 Creative now uses PlotSquared's platform-independent `PlotPlayer<?>` interface,
 removing its unnecessary dependency on PlotSquared's Bukkit implementation.
@@ -90,7 +104,7 @@ will need query/index work before high-volume production use.
 
 SQLite is a local file database. Sharing a file over a network filesystem or
 between different hosts is not a supported replacement for the old distributed
-MongoDB setup. RabbitMQ, audio, dashboards, and other service integrations are
+MongoDB setup. RabbitMQ, dashboards, and other service integrations are
 unchanged; an offline **build** does not make every runtime feature offline.
 
 ## Import existing data
