@@ -188,9 +188,13 @@ public class Core extends JavaPlugin {
         try {
             messageHandler = new MessageHandler();
             messageHandler.initialize();
-        } catch (IOException | TimeoutException e) {
-            e.printStackTrace();
-            Core.logMessage("MessageHandler", "Error initializing message queue connection!");
+        } catch (IOException | TimeoutException | IllegalArgumentException e) {
+            getLogger().log(java.util.logging.Level.SEVERE,
+                    "Core cannot start: required RabbitMQ messaging failed. Check the rabbitmq section in "
+                            + "plugins/Core/config.yml, broker availability and virtual-host permissions. " + e.getMessage(), e);
+            if (messageHandler != null) messageHandler.shutdown();
+            getServer().getPluginManager().disablePlugin(this);
+            return;
         }
         // Crafting Menu
         craftingMenu = new CraftingMenu();
@@ -284,12 +288,15 @@ public class Core extends JavaPlugin {
     @Override
     public final void onDisable() {
         try {
-            getMongoHandler().setServerOnline(instanceName, serverType, playground, false);
-            Core.getMessageHandler().sendStaffMessage(ChatColor.AQUA + "Network: " + ChatColor.YELLOW + getInstanceName() + " (MC)" + ChatColor.RED + " is safely shutting down");
+            if (mongoHandler != null) mongoHandler.setServerOnline(instanceName, serverType, playground, false);
+            if (messageHandler != null && messageHandler.ALL_PROXIES != null && messageHandler.PUBLISHING_CONNECTION.isOpen()) {
+                messageHandler.sendStaffMessage(ChatColor.AQUA + "Network: " + ChatColor.YELLOW + getInstanceName() + " (MC)" + ChatColor.RED + " is safely shutting down");
+            }
         } catch (Exception e) {
             e.printStackTrace();
             Core.logMessage("Core", "Error announcing server shutdown to message queue");
         }
+        if (messageHandler != null) messageHandler.shutdown();
         if (mongoHandler != null) mongoHandler.close();
         logMessage("Core", ChatColor.DARK_RED + "Disabled");
     }

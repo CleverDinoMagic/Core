@@ -66,6 +66,26 @@ ViaVersion is detected through reflection, supporting the legacy and current
 API package names without a ViaVersion compile dependency. PalaceBungee uses
 the public `ProxyServer` API instead of its internal `BungeeCord` class.
 
+## Required RabbitMQ messaging configuration
+
+RabbitMQ is required at runtime even though the build and SQLite persistence
+are offline. In `plugins/Core/config.yml`, configure `rabbitmq.host`,
+`rabbitmq.username`, and `rabbitmq.password` with your existing broker's actual
+settings. The bundled configuration leaves these values blank; it does not
+supply or fall back to guest credentials. `rabbitmq.port` defaults to AMQP port
+5672 and `rabbitmq.virtualhost` defaults to `/`; set the virtual host your broker
+user can access. Ports must be YAML integers in the range 1–65535.
+
+The configuration loader reads defaults from Core's bundled resource without
+replacing the server's config file or operator credentials. Old configurations
+therefore receive the standard port/virtual-host defaults, but missing credentials
+still require operator input. Missing sections, blank settings and invalid types
+produce a diagnostic naming the exact config keys and file, without printing
+credentials. Failed connections or required queue setup stop Core startup with
+an explicit error rather than running with messaging unavailable. Broker users
+need permission to declare and use the required exchanges/queues in that virtual
+host. No broker is started or credentials created by Core.
+
 ## SQLite configuration
 
 Core `plugins/Core/config.yml`:

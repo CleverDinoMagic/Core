@@ -15,3 +15,11 @@ loginSubtitle: ""
 loginFadeIn: 20
 loginStay: 100
 loginFadeOut: 20
+# Required messaging broker. Supply your broker's real host and credentials.
+# Core will stop with a diagnostic until these three blank values are configured.
+rabbitmq:
+  host: ""
+  port: 5672
+  virtualhost: "/"
+  username: ""
+  password: ""

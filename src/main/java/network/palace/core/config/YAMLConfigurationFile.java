@@ -8,6 +8,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 
 /**
@@ -69,12 +72,21 @@ public final class YAMLConfigurationFile {
      * Reload config.
      */
     public void reloadConfig() {
-        fileConfiguration = YamlConfiguration.loadConfiguration(configFile);
-        // Look for defaults in the jar
-        if (file != null) {
-            YamlConfiguration defConfig = YamlConfiguration.loadConfiguration(file);
-            fileConfiguration.setDefaults(defConfig);
+        try {
+            fileConfiguration = loadConfiguration(configFile, plugin.getResource(path + file.getName()));
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not load bundled defaults for " + file.getName(), e);
         }
+    }
+
+    static FileConfiguration loadConfiguration(File configFile, InputStream defaults) throws IOException {
+        FileConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+        if (defaults != null) {
+            try (InputStreamReader reader = new InputStreamReader(defaults, StandardCharsets.UTF_8)) {
+                config.setDefaults(YamlConfiguration.loadConfiguration(reader));
+            }
+        }
+        return config;
     }
 
     /**
