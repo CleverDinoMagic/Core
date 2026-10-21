@@ -29,19 +29,25 @@ public class MessageHandler {
 
     private final ConnectionFactory factory;
     private final HashMap<String, Channel> channels = new HashMap<>();
+    private volatile boolean shuttingDown;
 
     public MessageHandler() throws IOException, TimeoutException {
-        factory = new ConnectionFactory();
-        ConfigurationSection section = Core.getCoreConfig().getConfigurationSection("rabbitmq");
-        factory.setVirtualHost(section.getString("virtualhost"));
-        factory.setHost(section.getString("host"));
-        factory.setUsername(section.getString("username"));
-        factory.setPassword(section.getString("password"));
+        this(Core.getCoreConfig(), new ConnectionFactory());
+    }
 
+    MessageHandler(ConfigurationSection config, ConnectionFactory factory) throws IOException, TimeoutException {
+        RabbitMQConfiguration.configure(config, factory);
+        this.factory = factory;
         PUBLISHING_CONNECTION = factory.newConnection();
-        CONSUMING_CONNECTION = factory.newConnection();
+        try {
+            CONSUMING_CONNECTION = factory.newConnection();
+        } catch (IOException | TimeoutException | RuntimeException e) {
+            try { PUBLISHING_CONNECTION.close(); } catch (Exception cleanup) { e.addSuppressed(cleanup); }
+            throw e;
+        }
 
         PUBLISHING_CONNECTION.addShutdownListener(e -> {
+            if (shuttingDown || e.isInitiatedByApplication()) return;
             Core.getInstance().getLogger().warning("Publishing connection has been closed - reinitializing!");
             try {
                 PUBLISHING_CONNECTION = factory.newConnection();
@@ -51,6 +57,7 @@ public class MessageHandler {
             }
         });
         CONSUMING_CONNECTION.addShutdownListener(e -> {
+            if (shuttingDown || e.isInitiatedByApplication()) return;
             Core.getInstance().getLogger().warning("Consuming connection has been closed - reinitializing!");
             try {
                 CONSUMING_CONNECTION = factory.newConnection();
@@ -62,16 +69,19 @@ public class MessageHandler {
     }
 
     public void initialize() throws IOException, TimeoutException {
+        initialize(Core.getInstanceName());
+    }
+
+    void initialize(String instanceName) throws IOException, TimeoutException {
         try {
-            ALL_PROXIES = new MessageClient(ConnectionType.PUBLISHING, "all_proxies", "fanout");
-            ALL_MC = new MessageClient(ConnectionType.PUBLISHING, "all_mc", "fanout");
-            STATISTICS = new MessageClient(ConnectionType.PUBLISHING, "statistics", true);
-            PROXY_DIRECT = new MessageClient(ConnectionType.PUBLISHING, "proxy_direct", "direct");
-            MC_DIRECT = new MessageClient(ConnectionType.PUBLISHING, "mc_direct", "direct");
-            BOT = new MessageClient(ConnectionType.PUBLISHING, "bot-networking", true);
+            ALL_PROXIES = new MessageClient(PUBLISHING_CONNECTION, "all_proxies", "fanout");
+            ALL_MC = new MessageClient(PUBLISHING_CONNECTION, "all_mc", "fanout");
+            STATISTICS = new MessageClient(PUBLISHING_CONNECTION, "statistics", true);
+            PROXY_DIRECT = new MessageClient(PUBLISHING_CONNECTION, "proxy_direct", "direct");
+            MC_DIRECT = new MessageClient(PUBLISHING_CONNECTION, "mc_direct", "direct");
+            BOT = new MessageClient(PUBLISHING_CONNECTION, "bot-networking", true);
         } catch (Exception e) {
-            e.printStackTrace();
-            Core.getInstance().getLogger().severe("There was an error initializing essential message publishing queues!");
+            throw new IOException("Failed to initialise required RabbitMQ publishing queues; verify the broker's virtual-host permissions", e);
         }
 
         CancelCallback doNothing = consumerTag -> {
@@ -93,7 +103,7 @@ public class MessageHandler {
             }
         }, doNothing);
 
-        registerConsumer("mc_direct", "direct", Core.getInstanceName(), (consumerTag, delivery) -> {
+        registerConsumer("mc_direct", "direct", instanceName, (consumerTag, delivery) -> {
             try {
                 JsonObject object = parseDelivery(delivery);
                 Core.debugLog(object.toString());
@@ -169,7 +179,12 @@ public class MessageHandler {
         }
     }
 
-    public void shutdown() {
+    public synchronized void shutdown() {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        if (BOT != null) {
+            try { BOT.close(); } catch (Exception e) { e.printStackTrace(); }
+        }
         if (ALL_PROXIES != null) {
             try {
                 ALL_PROXIES.close();
@@ -214,6 +229,14 @@ public class MessageHandler {
             }
         });
         channels.clear();
+        closeConnection(PUBLISHING_CONNECTION);
+        closeConnection(CONSUMING_CONNECTION);
+    }
+
+    private void closeConnection(Connection connection) {
+        if (connection != null && connection.isOpen()) {
+            try { connection.close(); } catch (IOException e) { e.printStackTrace(); }
+        }
     }
 
     public void sendMessage(MQPacket packet, MessageClient client) throws IOException {
@@ -225,7 +248,7 @@ public class MessageHandler {
     }
 
     public void sendMessage(MQPacket packet, String exchange, String exchangeType, String routingKey) throws Exception {
-        MessageClient client = new MessageClient(ConnectionType.PUBLISHING, exchange, exchangeType);
+        MessageClient client = new MessageClient(PUBLISHING_CONNECTION, exchange, exchangeType);
         client.basicPublish(packet.toBytes(), routingKey);
         client.close();
     }
