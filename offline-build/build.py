@@ -4,8 +4,9 @@ import hashlib,os,pathlib,shutil,subprocess,sys,zipfile
 ROOT=pathlib.Path(__file__).resolve().parent
 WORKSPACE=ROOT.parent.parent
 os.chdir(ROOT)
+from tools.validate_plugin import validate_public_plugin
 def module_root(name):
- return ROOT/name if name in ('Storage','api-contracts') else WORKSPACE/name
+ return ROOT/name if name == 'Storage' else WORKSPACE/name
 def tool(name):
  home=os.environ.get('JAVA_HOME');path=str(pathlib.Path(home)/'bin'/name) if home else shutil.which(name)
  if not path:sys.exit('Set JAVA_HOME to a JDK 11 or newer (missing '+name+').')
@@ -43,10 +44,9 @@ storage=compile_module('Storage',processor=False)
 bootstrap=list((WORKSPACE/'Core/src/main/java/network/palace/core/plugin/processor').glob('*.java'))+[WORKSPACE/'Core/src/main/java/network/palace/core/plugin/PluginInfo.java']
 processor=compile_module('Processor',processor=False,sources=bootstrap)
 core=compile_module('Core',[storage,processor])
-contracts=compile_module('api-contracts',[core],processor=False)
 modules={}
 for name in ['Vanish','ParkWarp','Pictify','PalaceBungee','Lobby','Show','RideManager','ParkManager','Photopass','Creative']:
- modules[name]=compile_module(name,[core,storage,contracts,*modules.values()])
+ modules[name]=compile_module(name,[core,storage,*modules.values()])
 subprocess.run([sys.executable,'-m','unittest','discover','-s','tests','-v'],check=True)
 # Integration tests exercise persistence with the real SQLite native driver.
 tests=compile_module('StorageTests',[storage],processor=False,sources=sorted((ROOT/'Storage/src/test/java').rglob('*.java')))
@@ -83,6 +83,7 @@ def package(name,classes,roots=(),jars=()):
  with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as archive:
   for path,data in sorted(entries.items()):
    entry=zipfile.ZipInfo(path,(1980,1,1,0,0,0));entry.compress_type=zipfile.ZIP_DEFLATED;entry.external_attr=0o644<<16;archive.writestr(entry,data)
+ validate_public_plugin(target)
  print('Packaged '+str(target),flush=True)
 package('Core',core,[storage],runtime)
 for name,classes in modules.items():
@@ -92,3 +93,10 @@ for name,classes in modules.items():
 # Prove that the packaged Core contains SQLite and its dependencies.
 subprocess.run([java,'-cp',os.pathsep.join(map(str,[tests,OUTPUT/'Core.jar'])),'network.palace.storage.SQLiteStoreTest'],check=True)
 print('Built all eleven plugins offline.',flush=True)
+
+(OUTPUT/'INSTALL.txt').write_text(
+ 'Install Core, Lobby, ParkManager, ParkWarp, Photopass, Pictify, RideManager, Show and Vanish on the Bukkit/Paper server, with their public runtime dependencies.\n'
+ 'ParkManager needs WorldEdit and WorldGuard; Show also uses WorldEdit for its building tools.\n'
+ 'Install PalaceBungee.jar only on a BungeeCord-compatible proxy, never on Paper/Spigot.\n'
+ 'Creative.jar targets Minecraft 1.16 with compatible PlotSquared v5 and WorldEdit 7; it is not compatible with Paper 1.12.2.\n'
+ 'Audio and Cosmetics are not distributed. Audio cues and cosmetic menus are disabled in this public build.\n', encoding='utf-8')
