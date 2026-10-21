@@ -1,0 +1,2 @@
+# Preserve upstream license text verbatim.
+offline-build/vendor/licenses/** -whitespace

@@ -1,7 +1,7 @@
+db:
+  path: palace.sqlite
 sql:
-  url: jdbc:mysql://address:3306/Database
-  user: root
-  password: password
+  path: palace-sql.sqlite
 server-type: Unknown
 instance-name: ServerName
 dashboardURL: ws://socket.dashboard.playground.palace.network:7892

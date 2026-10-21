@@ -2,8 +2,8 @@ package network.palace.core.mongo;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.Block;
-import com.mongodb.MongoClient;
-import com.mongodb.MongoClientURI;
+import network.palace.storage.SQLiteStore;
+import java.io.File;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -34,7 +34,7 @@ import java.util.*;
 @SuppressWarnings("rawtypes")
 public class MongoHandler {
 
-    private MongoClient client = null;
+    private SQLiteStore client = null;
     @Getter private MongoDatabase database = null;
     private MongoCollection<Document> activityCollection = null;
     private MongoCollection<Document> playerCollection = null;
@@ -55,20 +55,12 @@ public class MongoHandler {
     }
 
     /**
-     * Connect to the MongoDB database
+     * Connect to the local SQLite database
      */
     public void connect() {
-        String username = Core.getCoreConfig().getString("db.user");
-        String password = Core.getCoreConfig().getString("db.password");
-        String hostname = Core.getCoreConfig().getString("db.hostname");
-        String dbName = Core.getCoreConfig().contains("db.database") ? Core.getCoreConfig().getString("db.database") : "palace";
-        if (username == null || password == null || hostname == null) {
-            Core.logMessage("Mongo Handler", ChatColor.RED + "" + ChatColor.BOLD + "Error with mongo config!");
-            Bukkit.shutdown();
-        }
-        MongoClientURI connectionString = new MongoClientURI("mongodb://" + username + ":" + password + "@" + hostname);
-        client = new MongoClient(connectionString);
-        database = client.getDatabase(dbName);
+        String path = Core.getCoreConfig().getString("db.path", "palace.sqlite");
+        client = new SQLiteStore(new File(path));
+        database = client.database();
         activityCollection = database.getCollection("activity");
         playerCollection = database.getCollection("players");
         friendsCollection = database.getCollection("friends");

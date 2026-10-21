@@ -290,6 +290,7 @@ public class Core extends JavaPlugin {
             e.printStackTrace();
             Core.logMessage("Core", "Error announcing server shutdown to message queue");
         }
+        if (mongoHandler != null) mongoHandler.close();
         logMessage("Core", ChatColor.DARK_RED + "Disabled");
     }
 
