@@ -8,12 +8,10 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 /**
- * Utility functions for interacting with MySQL.
+ * Utility functions for interacting with the local SQLite database.
  */
 public class SqlUtil {
     private String url = "";
-    private String user = "";
-    private String password = "";
 
     /**
      * Instantiates a new Sql util.
@@ -26,9 +24,12 @@ public class SqlUtil {
      * Load login.
      */
     private void loadLogin() {
-        url = Core.getCoreConfig().getString("sql.url");
-        user = Core.getCoreConfig().getString("sql.user");
-        password = Core.getCoreConfig().getString("sql.password");
+        java.io.File file = new java.io.File(Core.getCoreConfig().getString("sql.path", "palace-sql.sqlite")).getAbsoluteFile();
+        java.io.File parent = file.getParentFile();
+        if (!parent.isDirectory() && !parent.mkdirs()) throw new IllegalStateException("Cannot create " + parent);
+        url = "jdbc:sqlite:" + file.getAbsolutePath();
+        try { Class.forName("org.sqlite.JDBC"); } catch (ClassNotFoundException e) { throw new IllegalStateException(e); }
+
     }
 
     /**
@@ -38,7 +39,13 @@ public class SqlUtil {
      */
     public Connection getConnection() {
         try {
-            return DriverManager.getConnection(url, user, password);
+            Connection connection = DriverManager.getConnection(url);
+            try (java.sql.Statement statement = connection.createStatement()) {
+                statement.execute("PRAGMA busy_timeout=10000");
+                statement.execute("PRAGMA journal_mode=WAL");
+                statement.execute("CREATE TABLE IF NOT EXISTS pictify (id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT NOT NULL)");
+            }
+            return connection;
         } catch (SQLException e) {
             if (!Core.isDashboardAndSqlDisabled()) {
                 Core.logMessage("Core", ChatColor.RED + "Could not connect to database!");
