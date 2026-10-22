@@ -165,3 +165,8 @@ safe export import. The tests also run against the packaged Core JAR with no
 external classpath, checking that the SQLite runtime is embedded correctly.
 Minecraft server behavior still needs a deployment smoke test with its actual
 runtime plugins and configuration.
+
+Park pre-login is also tested with an empty SQLite database, a player without
+park data, and partial saved park settings. Missing login sections receive
+in-memory defaults without creating an incomplete player record or overwriting
+saved settings. These checks run against both compiled classes and Core.jar.

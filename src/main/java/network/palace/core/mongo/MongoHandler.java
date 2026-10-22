@@ -54,12 +54,20 @@ public class MongoHandler {
         connect();
     }
 
+    MongoHandler(File file) {
+        connect(file);
+    }
+
     /**
      * Connect to the local SQLite database
      */
     public void connect() {
         String path = Core.getCoreConfig().getString("db.path", "palace.sqlite");
-        client = new SQLiteStore(new File(path));
+        connect(new File(path));
+    }
+
+    private void connect(File file) {
+        client = new SQLiteStore(file);
         database = client.database();
         activityCollection = database.getCollection("activity");
         playerCollection = database.getCollection("players");
@@ -867,7 +875,18 @@ public class MongoHandler {
                 projection.append("parks." + s, 1);
             }
         }
-        return (Document) playerCollection.find(Filters.eq("uuid", uuid.toString())).projection(projection).first().get("parks");
+        Document player = playerCollection.find(Filters.eq("uuid", uuid.toString())).projection(projection).first();
+        Document parks = player == null ? null : player.get("parks", Document.class);
+        if (parks == null) parks = new Document();
+        // A fresh SQLite database may not have a proxy-created player yet.
+        // Supply transient defaults without inserting an incomplete player record.
+        for (String section : Arrays.asList("settings", "magicband", "fastpass")) {
+            if (parks.get(section) == null) parks.put(section, new Document());
+        }
+        if (parks.get("buildmode") == null) parks.put("buildmode", false);
+        if (parks.get("outfit") == null) parks.put("outfit", "0,0,0,0");
+        if (parks.get("outfitPurchases") == null) parks.put("outfitPurchases", new ArrayList<>());
+        return parks;
     }
 
     /**
