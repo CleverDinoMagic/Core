@@ -4,7 +4,7 @@ import org.bson.Document;
 import java.nio.file.*;
 import java.util.*;
 
-/** Exercises the pre-login query against the real SQLite storage layer. */
+/** Exercises the pre-login query against the real SQL storage layer. */
 public final class ParkJoinDataTest {
     private static void check(boolean value, String message) {
         if (!value) throw new AssertionError(message);
@@ -12,7 +12,16 @@ public final class ParkJoinDataTest {
 
     public static void main(String[] args) throws Exception {
         Path directory = Files.createTempDirectory("park-login-test");
-        MongoHandler handler = new MongoHandler(directory.resolve("palace.sqlite").toFile());
+        String mysqlConfig = System.getenv("PALACE_MYSQL_TEST_CONFIG");
+        network.palace.storage.DocumentStore store;
+        if (mysqlConfig == null) store = new network.palace.storage.SQLiteStore(directory.resolve("palace.sqlite").toFile());
+        else {
+            network.palace.storage.MySQLSettings settings = network.palace.storage.MySQLSettings.fromProperties(Paths.get(mysqlConfig));
+            if (!settings.database().startsWith("palace_test_")) throw new IllegalArgumentException("Use a dedicated schema named palace_test_...");
+            store = new network.palace.storage.MySQLStore(settings);
+            store.database().getCollection("players").deleteMany(new Document());
+        }
+        MongoHandler handler = new MongoHandler(store);
         try {
             UUID uuid = UUID.randomUUID();
             String[] fields = {"buildmode", "settings", "magicband", "fastpass", "outfit", "outfitPurchases"};
@@ -39,11 +48,12 @@ public final class ParkJoinDataTest {
             check(!handler.getDatabase().getCollection("players").find().first().get("parks", Document.class).containsKey("magicband"),
                     "Defaults must not overwrite stored data");
         } finally {
+            handler.getDatabase().getCollection("players").deleteMany(new Document());
             handler.close();
             try (java.util.stream.Stream<Path> paths = Files.walk(directory)) {
                 for (Path path : (Iterable<Path>) paths.sorted(Comparator.reverseOrder())::iterator) Files.delete(path);
             }
         }
-        System.out.println("SQLite park pre-login tests passed");
+        System.out.println("SQL park pre-login tests passed");
     }
 }

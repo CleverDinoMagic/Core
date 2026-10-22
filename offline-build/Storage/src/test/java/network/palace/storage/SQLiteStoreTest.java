@@ -65,15 +65,15 @@ public class SQLiteStoreTest {
         Path exports=Files.createDirectory(importFolder.resolve("exports"));
         Files.write(exports.resolve("players.json"),Arrays.asList(new Document("_id",id).append("uuid",uuid.toString()).toJson()));
         Path imported=importFolder.resolve("imported.sqlite");
-        ImportMongoExport.importDirectory(imported,exports);
+        ImportSQLiteMongoExport.importDirectory(imported,exports);
         try(SQLiteStore store=new SQLiteStore(imported.toFile())) {
             check(store.database().getCollection("players").find(Filters.eq("_id",id)).first().getString("uuid").equals(uuid.toString()),"import preserves ObjectId and player data");
         }
-        try { ImportMongoExport.importDirectory(imported,exports);throw new AssertionError("import overwrote destination"); }
+        try { ImportSQLiteMongoExport.importDirectory(imported,exports);throw new AssertionError("import overwrote destination"); }
         catch(java.io.IOException expected) { check(Files.exists(imported),"existing DB preserved"); }
         Files.write(exports.resolve("bad.json"),Arrays.asList("invalid JSON"));
         Path failed=importFolder.resolve("failed.sqlite");
-        try { ImportMongoExport.importDirectory(failed,exports);throw new AssertionError("invalid export accepted"); }
+        try { ImportSQLiteMongoExport.importDirectory(failed,exports);throw new AssertionError("invalid export accepted"); }
         catch(java.io.IOException expected) { check(!Files.exists(failed),"failed import must not publish DB"); }
         try(java.util.stream.Stream<Path> paths=Files.walk(importFolder)) { paths.sorted(Comparator.reverseOrder()).forEach(p->{try{Files.delete(p);}catch(Exception e){throw new RuntimeException(e);}}); }
         System.out.println("SQLite integration tests passed");

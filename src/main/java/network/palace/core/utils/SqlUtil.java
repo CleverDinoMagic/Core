@@ -1,57 +1,35 @@
 package network.palace.core.utils;
 
+import com.zaxxer.hikari.HikariDataSource;
 import network.palace.core.Core;
-import org.bukkit.ChatColor;
-
+import network.palace.storage.MySQLSettings;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 
-/**
- * Utility functions for interacting with the local SQLite database.
- */
-public class SqlUtil {
-    private String url = "";
+/** MySQL connections for Pictify and the plugins using Core's SQL API. */
+public class SqlUtil implements AutoCloseable {
+    private final HikariDataSource pool;
 
-    /**
-     * Instantiates a new Sql util.
-     */
     public SqlUtil() {
-        loadLogin();
+        this(MySQLSettings.from(key -> Core.getCoreConfig().get(key),
+                Core.getCoreConfig().isConfigurationSection("sql") && Core.getCoreConfig().contains("sql.host") ? "sql" : "mysql",
+                "plugins/Core/config.yml"));
     }
 
-    /**
-     * Load login.
-     */
-    private void loadLogin() {
-        java.io.File file = new java.io.File(Core.getCoreConfig().getString("sql.path", "palace-sql.sqlite")).getAbsoluteFile();
-        java.io.File parent = file.getParentFile();
-        if (!parent.isDirectory() && !parent.mkdirs()) throw new IllegalStateException("Cannot create " + parent);
-        url = "jdbc:sqlite:" + file.getAbsolutePath();
-        try { Class.forName("org.sqlite.JDBC"); } catch (ClassNotFoundException e) { throw new IllegalStateException(e); }
-
-    }
-
-    /**
-     * Gets sql connection.
-     *
-     * @return the connection
-     */
-    public Connection getConnection() {
-        try {
-            Connection connection = DriverManager.getConnection(url);
-            try (java.sql.Statement statement = connection.createStatement()) {
-                statement.execute("PRAGMA busy_timeout=10000");
-                statement.execute("PRAGMA journal_mode=WAL");
-                statement.execute("CREATE TABLE IF NOT EXISTS pictify (id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT NOT NULL)");
-            }
-            return connection;
+    public SqlUtil(MySQLSettings settings) {
+        pool = new HikariDataSource(settings.poolConfig());
+        try (Connection connection = pool.getConnection(); java.sql.Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE IF NOT EXISTS pictify (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, source TEXT NOT NULL) ENGINE=InnoDB");
         } catch (SQLException e) {
-            if (!Core.isDashboardAndSqlDisabled()) {
-                Core.logMessage("Core", ChatColor.RED + "Could not connect to database!");
-                ErrorUtil.displayError(e);
-            }
-            return null;
+            pool.close();
+            throw new IllegalStateException("Cannot initialize MySQL pictify table", e);
         }
     }
+
+    public Connection getConnection() {
+        try { return pool.getConnection(); }
+        catch (SQLException e) { throw new IllegalStateException("Cannot obtain MySQL connection", e); }
+    }
+
+    public void close() { pool.close(); }
 }

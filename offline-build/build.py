@@ -44,10 +44,10 @@ storage=compile_module('Storage',processor=False)
 bootstrap=list((WORKSPACE/'Core/src/main/java/network/palace/core/plugin/processor').glob('*.java'))+[WORKSPACE/'Core/src/main/java/network/palace/core/plugin/PluginInfo.java']
 processor=compile_module('Processor',processor=False,sources=bootstrap)
 core=compile_module('Core',[storage,processor])
-core_tests=compile_module('CoreTests',[core],processor=False,sources=sorted((ROOT/'CoreTests/src/main/java').rglob('*.java')))
+core_tests=compile_module('CoreTests',[core,storage],processor=False,sources=sorted((ROOT/'CoreTests/src/main/java').rglob('*.java')))
 java=str(pathlib.Path(JAVAC).with_name('java'))
 core_test_cp=os.pathsep.join(map(str,[core_tests,core,storage,*LIBS]))
-for test in ['network.palace.core.config.ConfigurationLoadingTest','network.palace.core.messagequeue.MessageHandlerTest','network.palace.core.mongo.ParkJoinDataTest']:
+for test in ['network.palace.core.config.ConfigurationLoadingTest','network.palace.core.messagequeue.MessageHandlerTest','network.palace.core.mongo.ParkJoinDataTest','network.palace.core.utils.SqlUtilTest']:
  subprocess.run([java,'-cp',core_test_cp,test],check=True)
 modules={}
 for name in ['Vanish','ParkWarp','Pictify','PalaceBungee','Lobby','Show','RideManager','ParkManager','Photopass','Creative']:
@@ -56,7 +56,8 @@ subprocess.run([sys.executable,'-m','unittest','discover','-s','tests','-v'],che
 # Integration tests exercise persistence with the real SQLite native driver.
 tests=compile_module('StorageTests',[storage],processor=False,sources=sorted((ROOT/'Storage/src/test/java').rglob('*.java')))
 java=str(pathlib.Path(JAVAC).with_name('java'))
-subprocess.run([java,'-cp',os.pathsep.join(map(str,[tests,storage,*LIBS])),'network.palace.storage.SQLiteStoreTest'],check=True)
+for test in ['SQLiteStoreTest','MySQLSettingsTest','MySQLStoreTest']:
+ subprocess.run([java,'-cp',os.pathsep.join(map(str,[tests,storage,*LIBS])),'network.palace.storage.'+test],check=True)
 
 OUTPUT=pathlib.Path(os.environ.get('PALACE_BUILD_OUTPUT',str(ROOT/'dist')))
 OUTPUT.mkdir(parents=True,exist_ok=True)
@@ -95,10 +96,12 @@ for name,classes in modules.items():
  extra=[storage] if name=='PalaceBungee' else []
  libraries=runtime if name=='PalaceBungee' else ([p for p in LIBS if p.name.startswith(('okhttp-','okio-','kotlin-stdlib-'))] if name=='Photopass' else [p for p in LIBS if p.name=='anvilgui.jar'] if name=='Creative' else [])
  package(name,classes,extra,libraries)
-# Prove that the packaged Core contains SQLite and its dependencies.
-subprocess.run([java,'-cp',os.pathsep.join(map(str,[tests,OUTPUT/'Core.jar'])),'network.palace.storage.SQLiteStoreTest'],check=True)
+# Prove both packaged plugins contain their MySQL runtime and migration dependencies.
+for artifact in ['Core','PalaceBungee']:
+ for test in ['SQLiteStoreTest','MySQLSettingsTest','MySQLStoreTest']:
+  subprocess.run([java,'-cp',os.pathsep.join(map(str,[tests,OUTPUT/(artifact+'.jar')])),'network.palace.storage.'+test],check=True)
 # Repeat config and messaging tests against the packaged Core and its defaults.
-for test in ['network.palace.core.config.ConfigurationLoadingTest','network.palace.core.messagequeue.MessageHandlerTest','network.palace.core.mongo.ParkJoinDataTest']:
+for test in ['network.palace.core.config.ConfigurationLoadingTest','network.palace.core.messagequeue.MessageHandlerTest','network.palace.core.mongo.ParkJoinDataTest','network.palace.core.utils.SqlUtilTest']:
  subprocess.run([java,'-cp',os.pathsep.join(map(str,[core_tests,OUTPUT/'Core.jar',*[p for p in LIBS if p.name.startswith(provided)]])),test],check=True)
 print('Built all eleven plugins offline.',flush=True)
 
@@ -107,4 +110,5 @@ print('Built all eleven plugins offline.',flush=True)
  'ParkManager needs WorldEdit and WorldGuard; Show also uses WorldEdit for its building tools.\n'
  'Install PalaceBungee.jar only on a BungeeCord-compatible proxy, never on Paper/Spigot.\n'
  'Creative.jar targets Minecraft 1.16 with compatible PlotSquared v5 and WorldEdit 7; it is not compatible with Paper 1.12.2.\n'
+ 'Configure mysql.host, mysql.port, mysql.database, mysql.username and mysql.password in Core and PalaceBungee to use the same MySQL schema.\n'
  'Audio and Cosmetics are not distributed. Audio cues and cosmetic menus are disabled in this public build.\n', encoding='utf-8')

@@ -2,8 +2,9 @@ package network.palace.core.mongo;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.Block;
-import network.palace.storage.SQLiteStore;
-import java.io.File;
+import network.palace.storage.DocumentStore;
+import network.palace.storage.MySQLStore;
+import network.palace.storage.MySQLSettings;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -34,7 +35,7 @@ import java.util.*;
 @SuppressWarnings("rawtypes")
 public class MongoHandler {
 
-    private SQLiteStore client = null;
+    private DocumentStore client = null;
     @Getter private MongoDatabase database = null;
     private MongoCollection<Document> activityCollection = null;
     private MongoCollection<Document> playerCollection = null;
@@ -54,20 +55,19 @@ public class MongoHandler {
         connect();
     }
 
-    MongoHandler(File file) {
-        connect(file);
+    MongoHandler(DocumentStore store) {
+        connect(store);
     }
 
     /**
-     * Connect to the local SQLite database
+     * Connect to the shared MySQL database
      */
     public void connect() {
-        String path = Core.getCoreConfig().getString("db.path", "palace.sqlite");
-        connect(new File(path));
+        connect(new MySQLStore(MySQLSettings.from(key -> Core.getCoreConfig().get(key), "mysql", "plugins/Core/config.yml")));
     }
 
-    private void connect(File file) {
-        client = new SQLiteStore(file);
+    private void connect(DocumentStore store) {
+        client = store;
         database = client.database();
         activityCollection = database.getCollection("activity");
         playerCollection = database.getCollection("players");
@@ -878,7 +878,7 @@ public class MongoHandler {
         Document player = playerCollection.find(Filters.eq("uuid", uuid.toString())).projection(projection).first();
         Document parks = player == null ? null : player.get("parks", Document.class);
         if (parks == null) parks = new Document();
-        // A fresh SQLite database may not have a proxy-created player yet.
+        // A fresh MySQL database may not have a proxy-created player yet.
         // Supply transient defaults without inserting an incomplete player record.
         for (String section : Arrays.asList("settings", "magicband", "fastpass")) {
             if (parks.get(section) == null) parks.put(section, new Document());

@@ -287,6 +287,7 @@ public class Core extends JavaPlugin {
 
     @Override
     public final void onDisable() {
+        if (sqlUtil != null) sqlUtil.close();
         try {
             if (mongoHandler != null) mongoHandler.setServerOnline(instanceName, serverType, playground, false);
             if (messageHandler != null && messageHandler.ALL_PROXIES != null && messageHandler.PUBLISHING_CONNECTION.isOpen()) {

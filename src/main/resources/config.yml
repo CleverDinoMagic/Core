@@ -1,7 +1,11 @@
-db:
-  path: palace.sqlite
-sql:
-  path: palace-sql.sqlite
+# Required: MySQL 8 server and an existing schema shared by Core and PalaceBungee.
+mysql:
+  host: ''
+  port: 3306
+  database: palace
+  username: ''
+  password: ''
+  ssl-mode: PREFERRED
 server-type: Unknown
 instance-name: ServerName
 dashboardURL: ws://socket.dashboard.playground.palace.network:7892
