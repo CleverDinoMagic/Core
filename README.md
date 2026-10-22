@@ -7,7 +7,7 @@ This is Clutch's baby. Pls don't murder it too much. <3
 [![forthebadge](https://forthebadge.com/images/badges/fuck-it-ship-it.svg)](https://forthebadge.com)
 [![forthebadge](https://forthebadge.com/images/badges/oooo-kill-em.svg)](https://forthebadge.com)
 
-## Offline build and SQLite migration
+## Offline build and MySQL migration
 
 See [the offline build kit](offline-build/README.md) for the bundled dependencies,
-build command, SQLite configuration, migration tools, and validation notes.
+build command, MySQL configuration, migration tools, and validation notes.
