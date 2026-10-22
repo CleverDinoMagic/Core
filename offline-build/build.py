@@ -46,8 +46,8 @@ processor=compile_module('Processor',processor=False,sources=bootstrap)
 core=compile_module('Core',[storage,processor])
 core_tests=compile_module('CoreTests',[core],processor=False,sources=sorted((ROOT/'CoreTests/src/main/java').rglob('*.java')))
 java=str(pathlib.Path(JAVAC).with_name('java'))
-core_test_cp=os.pathsep.join(map(str,[core_tests,core,*LIBS]))
-for test in ['network.palace.core.config.ConfigurationLoadingTest','network.palace.core.messagequeue.MessageHandlerTest']:
+core_test_cp=os.pathsep.join(map(str,[core_tests,core,storage,*LIBS]))
+for test in ['network.palace.core.config.ConfigurationLoadingTest','network.palace.core.messagequeue.MessageHandlerTest','network.palace.core.mongo.ParkJoinDataTest']:
  subprocess.run([java,'-cp',core_test_cp,test],check=True)
 modules={}
 for name in ['Vanish','ParkWarp','Pictify','PalaceBungee','Lobby','Show','RideManager','ParkManager','Photopass','Creative']:
@@ -98,7 +98,7 @@ for name,classes in modules.items():
 # Prove that the packaged Core contains SQLite and its dependencies.
 subprocess.run([java,'-cp',os.pathsep.join(map(str,[tests,OUTPUT/'Core.jar'])),'network.palace.storage.SQLiteStoreTest'],check=True)
 # Repeat config and messaging tests against the packaged Core and its defaults.
-for test in ['network.palace.core.config.ConfigurationLoadingTest','network.palace.core.messagequeue.MessageHandlerTest']:
+for test in ['network.palace.core.config.ConfigurationLoadingTest','network.palace.core.messagequeue.MessageHandlerTest','network.palace.core.mongo.ParkJoinDataTest']:
  subprocess.run([java,'-cp',os.pathsep.join(map(str,[core_tests,OUTPUT/'Core.jar',*[p for p in LIBS if p.name.startswith(provided)]])),test],check=True)
 print('Built all eleven plugins offline.',flush=True)
 
